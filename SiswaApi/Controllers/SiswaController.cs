@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SiswaApi.Data;
 using SiswaApi.Dto;
@@ -24,20 +24,29 @@ namespace SiswaApi.Controllers
         [HttpGet]
         public async Task<IActionResult> GetSiswa()
         {
-            // Cek apakah data ada di cache Redis
             var cachedSiswa = await _redisCacheService.GetCacheAsync<List<Siswa>>(SiswaCacheKey);
             if (cachedSiswa != null)
             {
                 return Ok(cachedSiswa);
             }
 
-            // Jika tidak ada di cache, ambil dari database
             var siswaList = await _context.Siswas.ToListAsync();
-
-            // Simpan ke Redis cache
             await _redisCacheService.SetCacheAsync(SiswaCacheKey, siswaList, TimeSpan.FromMinutes(10));
 
             return Ok(siswaList);
+        }
+
+        // GET: api/siswa/{id}
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetSiswaById(int id)
+        {
+            var siswa = await _context.Siswas.FindAsync(id);
+            if (siswa == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(siswa);
         }
 
         // POST: api/siswa
@@ -57,10 +66,53 @@ namespace SiswaApi.Controllers
             await _context.SaveChangesAsync();
 
             var siswaList = await _context.Siswas.ToListAsync();
-
             await _redisCacheService.SetCacheAsync(SiswaCacheKey, siswaList, TimeSpan.FromMinutes(10));
 
             return CreatedAtAction(nameof(GetSiswa), new { id = siswa.Id }, siswa);
+        }
+
+        // PUT: api/siswa/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutSiswa(int id, PostSiswaDto siswaDto)
+        {
+            var siswa = await _context.Siswas.FindAsync(id);
+            if (siswa == null)
+            {
+                return NotFound();
+            }
+
+            siswa.Nama = siswaDto.Nama;
+            siswa.Kelas = siswaDto.Kelas;
+            siswa.Umur = siswaDto.Umur;
+            siswa.WaliKelas = siswaDto.WaliKelas;
+            siswa.AsalKota = siswaDto.AsalKota;
+
+            _context.Entry(siswa).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            var siswaList = await _context.Siswas.ToListAsync();
+            await _redisCacheService.SetCacheAsync(SiswaCacheKey, siswaList, TimeSpan.FromMinutes(10));
+
+            return NoContent();
+        }
+
+        // DELETE: api/siswa/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteSiswa(int id)
+        {
+            var siswa = await _context.Siswas.FindAsync(id);
+            if (siswa == null)
+            {
+                return NotFound();
+            }
+
+            _context.Siswas.Remove(siswa);
+            await _context.SaveChangesAsync();
+
+            var siswaList = await _context.Siswas.ToListAsync();
+            await _redisCacheService.SetCacheAsync(SiswaCacheKey, siswaList, TimeSpan.FromMinutes(10));
+
+            return NoContent();
         }
     }
 }
